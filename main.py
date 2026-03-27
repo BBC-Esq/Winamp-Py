@@ -528,6 +528,9 @@ class FullscreenWindow(QWidget):
             return
 
         global_pos = QCursor.pos()
+        if not self.geometry().contains(global_pos):
+            return
+
         local_pos = self.mapFromGlobal(global_pos)
         y = local_pos.y()
 
