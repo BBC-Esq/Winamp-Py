@@ -15,7 +15,6 @@ from OpenGL import GL
 
 
 class GeissSettingsDialog(QDialog):
-    """Settings dialog for Geiss visualization."""
     
     settings_changed = Signal()
     
@@ -31,7 +30,6 @@ class GeissSettingsDialog(QDialog):
     def setup_ui(self):
         layout = QVBoxLayout(self)
         
-        # Wave mode
         wave_group = QGroupBox("Waveform")
         wave_layout = QFormLayout(wave_group)
         
@@ -51,7 +49,6 @@ class GeissSettingsDialog(QDialog):
         
         layout.addWidget(wave_group)
         
-        # Color palette
         color_group = QGroupBox("Colors")
         color_layout = QFormLayout(color_group)
         
@@ -71,7 +68,6 @@ class GeissSettingsDialog(QDialog):
         
         layout.addWidget(color_group)
         
-        # Warp mode
         warp_group = QGroupBox("Warp Motion")
         warp_layout = QFormLayout(warp_group)
         
@@ -96,14 +92,12 @@ class GeissSettingsDialog(QDialog):
         self.warp_combo.currentIndexChanged.connect(self.on_warp_changed)
         warp_layout.addRow("Warp Mode:", self.warp_combo)
         
-        # Instant warp transition (like original Geiss)
         self.instant_warp_check = QCheckBox("Instant warp transitions (like original Geiss)")
         self.instant_warp_check.stateChanged.connect(self.on_instant_warp_changed)
         warp_layout.addRow(self.instant_warp_check)
         
         layout.addWidget(warp_group)
         
-        # Decay/trail settings
         decay_group = QGroupBox("Trails")
         decay_layout = QVBoxLayout(decay_group)
         
@@ -121,7 +115,6 @@ class GeissSettingsDialog(QDialog):
         self.beat_decay_check.stateChanged.connect(self.on_beat_decay_changed)
         decay_layout.addWidget(self.beat_decay_check)
         
-        # Error diffusion dithering (like original Geiss)
         self.dither_check = QCheckBox("Error diffusion grain (like original Geiss)")
         self.dither_check.stateChanged.connect(self.on_dither_changed)
         decay_layout.addWidget(self.dither_check)
@@ -138,7 +131,6 @@ class GeissSettingsDialog(QDialog):
         
         layout.addWidget(decay_group)
         
-        # Effects
         effects_group = QGroupBox("Effects")
         effects_layout = QVBoxLayout(effects_group)
         
@@ -164,7 +156,6 @@ class GeissSettingsDialog(QDialog):
         
         layout.addWidget(effects_group)
         
-        # Auto-change settings
         auto_group = QGroupBox("Auto-Change")
         auto_layout = QVBoxLayout(auto_group)
         
@@ -185,7 +176,6 @@ class GeissSettingsDialog(QDialog):
         
         layout.addWidget(auto_group)
         
-        # Buttons
         button_layout = QHBoxLayout()
         
         self.randomize_btn = QPushButton("Randomize All")
@@ -205,7 +195,6 @@ class GeissSettingsDialog(QDialog):
         layout.addLayout(button_layout)
     
     def load_current_settings(self):
-        """Load current visualization settings into the dialog."""
         self.wave_combo.setCurrentIndex(self.visualization.wave_mode)
         self.palette_combo.setCurrentIndex(self.visualization.palette_index)
         self.warp_combo.setCurrentIndex(self.visualization.warp_mode)
@@ -281,7 +270,6 @@ class GeissSettingsDialog(QDialog):
         self.settings_changed.emit()
     
     def randomize_all(self):
-        """Randomize all settings."""
         self.visualization.wave_mode = random.randint(0, self.visualization.num_wave_modes - 1)
         self.visualization.palette_index = random.randint(0, len(self.visualization.palettes) - 1)
         self.visualization.apply_warp_mode(random.randint(0, self.visualization.num_warp_modes - 1), instant=True)
@@ -296,7 +284,6 @@ class GeissSettingsDialog(QDialog):
         self.settings_changed.emit()
     
     def reset_to_defaults(self):
-        """Reset all settings to defaults."""
         self.visualization.wave_mode = 0
         self.visualization.palette_index = 0
         self.visualization.apply_warp_mode(0, instant=True)
@@ -339,7 +326,6 @@ class GeissVisualization(QOpenGLWidget):
         self.fbo2 = None
         self.current_fbo = 0
         
-        # Current warp parameters (actively used)
         self.warp_mode = 0
         self.num_warp_modes = 15
         self.warp_timer = 0
@@ -351,13 +337,11 @@ class GeissVisualization(QOpenGLWidget):
         self.drift_x = 0.0
         self.drift_y = 0.0
         
-        # Target warp parameters (for smooth transitions)
         self.target_zoom = 1.02
         self.target_rotation = 0.005
         self.target_drift_x = 0.0
         self.target_drift_y = 0.0
         
-        # Next warp map (prepared in background, like original Geiss)
         self.next_warp_ready = False
         self.next_zoom = 1.02
         self.next_rotation = 0.005
@@ -365,10 +349,8 @@ class GeissVisualization(QOpenGLWidget):
         self.next_drift_y = 0.0
         self.next_warp_mode = 0
         
-        # Instant warp transition (like original Geiss)
         self.instant_warp = True
         
-        # Error diffusion dithering (like original Geiss)
         self.dither_enabled = True
         self.dither_amount = 0.008
         self.dither_texture = None
@@ -416,7 +398,6 @@ class GeissVisualization(QOpenGLWidget):
         
         self.load_settings()
         
-        # Prepare the first "next" warp map
         self.prepare_next_warp()
         
         self.animation_timer = QTimer(self)
@@ -424,7 +405,6 @@ class GeissVisualization(QOpenGLWidget):
         self.animation_timer.start(33)
     
     def show_settings_dialog(self, parent=None):
-        """Show the settings dialog."""
         dialog = GeissSettingsDialog(self, parent)
         dialog.exec()
         self.save_settings()
@@ -490,7 +470,6 @@ class GeissVisualization(QOpenGLWidget):
         settings.setValue("warp_duration", self.warp_duration)
     
     def get_warp_params(self, mode):
-        """Get warp parameters for a given mode. Returns (zoom, rotation, drift_x, drift_y)."""
         if mode == 0:
             return (1.01 + random.random() * 0.015, 
                     0.002 + random.random() * 0.004, 
@@ -536,32 +515,26 @@ class GeissVisualization(QOpenGLWidget):
             return (1.03, 0.0, 0.0, 0.0)
     
     def prepare_next_warp(self):
-        """Prepare the next warp map in the background (like original Geiss)."""
         self.next_warp_mode = random.randint(0, self.num_warp_modes - 1)
         params = self.get_warp_params(self.next_warp_mode)
         self.next_zoom, self.next_rotation, self.next_drift_x, self.next_drift_y = params
         self.next_warp_ready = True
     
     def apply_warp_mode(self, mode, instant=False):
-        """Apply a specific warp mode's settings."""
         self.warp_mode = mode
         params = self.get_warp_params(mode)
         
         if instant or self.instant_warp:
-            # Instant switch (like original Geiss)
             self.zoom, self.rotation, self.drift_x, self.drift_y = params
             self.target_zoom, self.target_rotation, self.target_drift_x, self.target_drift_y = params
         else:
-            # Smooth transition
             self.target_zoom, self.target_rotation, self.target_drift_x, self.target_drift_y = params
     
     def switch_to_next_warp(self):
-        """Switch to the prepared next warp map instantly (like original Geiss)."""
         if self.next_warp_ready:
             self.warp_mode = self.next_warp_mode
             
             if self.instant_warp:
-                # Instant switch
                 self.zoom = self.next_zoom
                 self.rotation = self.next_rotation
                 self.drift_x = self.next_drift_x
@@ -574,7 +547,6 @@ class GeissVisualization(QOpenGLWidget):
             
             self.next_warp_ready = False
             
-            # Start preparing the next one
             self.prepare_next_warp()
     
     def mouseDoubleClickEvent(self, event: QMouseEvent):
@@ -585,7 +557,6 @@ class GeissVisualization(QOpenGLWidget):
         self.is_playing = playing
     
     def select_new_warp(self):
-        """Select and switch to a new warp mode."""
         self.switch_to_next_warp()
     
     def animate(self):
@@ -616,14 +587,12 @@ class GeissVisualization(QOpenGLWidget):
         
         if self.is_playing:
             if not self.instant_warp:
-                # Smooth transition
                 lerp = 0.03
                 self.zoom += (self.target_zoom - self.zoom) * lerp
                 self.rotation += (self.target_rotation - self.rotation) * lerp
                 self.drift_x += (self.target_drift_x - self.drift_x) * lerp
                 self.drift_y += (self.target_drift_y - self.drift_y) * lerp
             
-            # Bass influence on zoom
             bass_influence = self.smoothed_bass * 0.005
             self.zoom = self.target_zoom + bass_influence
         
@@ -645,7 +614,6 @@ class GeissVisualization(QOpenGLWidget):
                 self.last_beat_time = current_time
                 if self.beat_decay:
                     self.decay = max(0.975, self.decay - 0.01)
-                # On a good beat, potentially switch to next warp (like original Geiss)
                 if self.auto_change and self.next_warp_ready and random.random() < 0.15:
                     self.warp_timer = self.warp_duration
         
@@ -665,10 +633,8 @@ class GeissVisualization(QOpenGLWidget):
         self.init_dither_texture()
     
     def init_dither_texture(self):
-        """Create a noise texture for error diffusion dithering."""
         size = 256
         noise = np.random.rand(size, size).astype(np.float32)
-        # Convert to grayscale values centered around 0
         noise = (noise - 0.5) * 2.0
         
         self.dither_texture = GL.glGenTextures(1)
@@ -724,7 +690,6 @@ class GeissVisualization(QOpenGLWidget):
         self.draw_background()
         self.draw_warped_feedback(source_fbo)
         
-        # Apply error diffusion dithering
         if self.dither_enabled:
             self.draw_dither_effect()
         
@@ -805,29 +770,19 @@ class GeissVisualization(QOpenGLWidget):
         return v, v, v
     
     def draw_dither_effect(self):
-        """Apply error diffusion-like dithering effect.
-        
-        The original Geiss carried rounding errors to neighboring pixels during
-        the bit shift. We approximate this with animated noise that adds texture
-        and grain to the movement.
-        """
         if self.dither_texture is None:
             return
         
         GL.glEnable(GL.GL_TEXTURE_2D)
         GL.glBindTexture(GL.GL_TEXTURE_2D, self.dither_texture)
         
-        # Additive blending for the noise
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE)
         
-        # Animate the noise by offsetting texture coordinates
         offset_x = (self.dither_offset * 0.1) % 1.0
         offset_y = (self.dither_offset * 0.073) % 1.0
         
-        # Scale determines how "zoomed in" the noise is
         scale = 4.0
         
-        # The dither amount scales with audio energy for that reactive grain feel
         dither_strength = self.dither_amount * (0.8 + self.smoothed_mid * 0.4)
         
         GL.glColor4f(dither_strength, dither_strength, dither_strength, 1.0)

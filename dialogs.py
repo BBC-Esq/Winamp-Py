@@ -18,7 +18,6 @@ from PySide6.QtWidgets import (
 
 
 class LabeledSlider(QWidget):
-    """A slider with a label showing its current value."""
     
     valueChanged = Signal(float)
     
@@ -64,22 +63,17 @@ class LabeledSlider(QWidget):
 
 
 class VisualizationSettingsDialog(QDialog):
-    """Settings dialog for visualization parameters."""
     
     settings_changed = Signal(dict)
     
-    # Default values
     DEFAULTS = {
-        # Decay/Trails
         'decay': 0.985,
         'beat_decay_enabled': True,
         'beat_decay_amount': 0.01,
         
-        # Line appearance
         'line_width_base': 2.5,
         'line_width_bass_mult': 2.5,
         
-        # Glow effect
         'glow_outer_width': 3.5,
         'glow_outer_alpha': 0.10,
         'glow_outer_brightness': 0.5,
@@ -89,21 +83,17 @@ class VisualizationSettingsDialog(QDialog):
         'glow_core_alpha': 0.80,
         'glow_core_brightness': 1.0,
         
-        # Colors
         'color_speed': 0.008,
         'palette_index': 0,
         'color_tint_saturation': 0.07,
         
-        # Background
         'bg_brightness': 0.02,
         'bg_bass_influence': 0.015,
         'bg_saturation': 0.4,
         
-        # Brightness
         'base_brightness': 0.6,
         'bass_brightness_mult': 0.4,
         
-        # Particles/Effects
         'nebula_enabled': True,
         'nebula_count_base': 12,
         'nebula_count_mult': 15,
@@ -118,7 +108,6 @@ class VisualizationSettingsDialog(QDialog):
         'solar_intensity': 1.3,
         'solar_alpha': 0.5,
         
-        # Timing
         'warp_duration': 600,
         'audio_smoothing': 0.7,
     }
@@ -141,7 +130,6 @@ class VisualizationSettingsDialog(QDialog):
         
         tabs = QTabWidget()
         
-        # Trails Tab
         trails_tab = QWidget()
         trails_layout = QVBoxLayout(trails_tab)
         
@@ -178,7 +166,6 @@ class VisualizationSettingsDialog(QDialog):
         
         tabs.addTab(trails_tab, "Trails")
         
-        # Lines Tab
         lines_tab = QWidget()
         lines_layout = QVBoxLayout(lines_tab)
         
@@ -238,7 +225,6 @@ class VisualizationSettingsDialog(QDialog):
         
         tabs.addTab(lines_tab, "Lines & Glow")
         
-        # Colors Tab
         colors_tab = QWidget()
         colors_layout = QVBoxLayout(colors_tab)
         
@@ -305,7 +291,6 @@ class VisualizationSettingsDialog(QDialog):
         
         tabs.addTab(colors_tab, "Colors")
         
-        # Effects Tab
         effects_tab = QWidget()
         effects_layout = QVBoxLayout(effects_tab)
         
@@ -373,7 +358,6 @@ class VisualizationSettingsDialog(QDialog):
         
         layout.addWidget(tabs)
         
-        # Buttons
         button_layout = QHBoxLayout()
         
         self.reset_btn = QPushButton("Reset to Defaults")
@@ -398,7 +382,6 @@ class VisualizationSettingsDialog(QDialog):
         self.settings_changed.emit(self.settings)
     
     def load_values(self):
-        """Load current settings into UI widgets."""
         self.decay_slider.setValue(self.settings['decay'])
         self.beat_decay_check.setChecked(self.settings['beat_decay_enabled'])
         self.beat_decay_slider.setValue(self.settings['beat_decay_amount'])
@@ -443,11 +426,9 @@ class VisualizationSettingsDialog(QDialog):
         self.solar_alpha_slider.setValue(self.settings['solar_alpha'])
     
     def reset_to_defaults(self):
-        """Reset all settings to default values."""
         self.settings = dict(self.DEFAULTS)
         self.load_values()
         self.settings_changed.emit(self.settings)
     
     def get_settings(self):
-        """Return the current settings dictionary."""
         return self.settings

@@ -744,7 +744,6 @@ class MusicPlayer(QMainWindow):
         main_layout.addWidget(instructions)
 
     def show_visualization_settings(self):
-        """Show the settings dialog for the current visualization."""
         if self.visualizer and hasattr(self.visualizer, 'show_settings_dialog'):
             self.visualizer.show_settings_dialog(self)
 
@@ -1087,7 +1086,6 @@ class MusicPlayer(QMainWindow):
         if self.is_fullscreen:
             self.exit_fullscreen()
         
-        # Save visualization settings before cleanup
         if self.visualizer:
             self.visualizer.save_settings()
             self.visualizer.cleanup()
