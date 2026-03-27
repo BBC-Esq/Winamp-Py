@@ -2,7 +2,11 @@
 
 A Winamp-inspired media player built with Python, featuring real-time audio visualizations powered by OpenGL.
 
-![Winamp-Py Screenshot](screenshot.png)
+<div align="center">
+
+<img width="655" height="905" alt="image" src="https://github.com/user-attachments/assets/ec8fe236-c5f9-4d3a-987e-7927bb737a9e" />
+
+</div>
 
 ## Features
 
