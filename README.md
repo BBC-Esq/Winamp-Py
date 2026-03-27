@@ -20,7 +20,7 @@ A Winamp-inspired media player built with Python, featuring real-time audio visu
 
 ## Requirements
 
-- Python 3.12+
+- Python 3.10+
 - [VLC media player](https://www.videolan.org/vlc/) must be installed on your system
 
 ## Installation
