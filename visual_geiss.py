@@ -549,6 +549,18 @@ class GeissVisualization(QOpenGLWidget):
             
             self.prepare_next_warp()
     
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.MouseButton.RightButton:
+            from PySide6.QtWidgets import QMenu
+            menu = QMenu(self)
+            settings_action = menu.addAction("Visualization Settings...")
+            action = menu.exec(event.globalPosition().toPoint())
+            if action == settings_action:
+                self.show_settings_dialog(self.window())
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
     def mouseDoubleClickEvent(self, event: QMouseEvent):
         self.double_clicked.emit()
         event.accept()
