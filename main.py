@@ -468,6 +468,46 @@ class FullscreenWindow(QWidget):
         self.mouse_poll_timer.start(100)
         self.last_cursor_pos = None
 
+        self.volume_osd = QWidget(self)
+        self.volume_osd.setFixedSize(60, 280)
+        self.volume_osd.setStyleSheet("background: transparent;")
+
+        osd_layout = QVBoxLayout(self.volume_osd)
+        osd_layout.setContentsMargins(0, 0, 0, 0)
+        osd_layout.setSpacing(4)
+
+        self.volume_osd_label = QLabel("70%")
+        self.volume_osd_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.volume_osd_label.setStyleSheet("color: white; font-size: 12px; font-weight: bold; background: transparent;")
+        osd_layout.addWidget(self.volume_osd_label)
+
+        self.volume_osd_bar_bg = QWidget()
+        self.volume_osd_bar_bg.setFixedSize(12, 240)
+        self.volume_osd_bar_bg.setStyleSheet("background-color: rgba(60, 60, 60, 180); border-radius: 4px;")
+
+        self.volume_osd_bar_fill = QWidget(self.volume_osd_bar_bg)
+        self.volume_osd_bar_fill.setStyleSheet("background-color: rgba(0, 120, 200, 220); border-radius: 4px;")
+        self._update_osd_bar(70)
+
+        bar_container = QHBoxLayout()
+        bar_container.addStretch()
+        bar_container.addWidget(self.volume_osd_bar_bg)
+        bar_container.addStretch()
+        osd_layout.addLayout(bar_container)
+
+        self.volume_osd_opacity = QGraphicsOpacityEffect(self.volume_osd)
+        self.volume_osd.setGraphicsEffect(self.volume_osd_opacity)
+        self.volume_osd_opacity.setOpacity(0.0)
+
+        self.volume_osd_fade = QPropertyAnimation(self.volume_osd_opacity, b"opacity")
+        self.volume_osd_fade.setDuration(300)
+        self.volume_osd_fade.setEasingCurve(QEasingCurve.Type.InOutQuad)
+
+        self.volume_osd_timer = QTimer(self)
+        self.volume_osd_timer.setSingleShot(True)
+        self.volume_osd_timer.timeout.connect(self._fade_out_volume_osd)
+        self.volume_osd_showing = False
+
     def _on_playlist_double_click(self, item):
         row = self.playlist_mirror.row(item)
         self.track_double_clicked.emit(row)
@@ -600,6 +640,38 @@ class FullscreenWindow(QWidget):
         if not self.panel_visible:
             self.setCursor(QCursor(Qt.CursorShape.BlankCursor))
 
+    def _update_osd_bar(self, volume):
+        bar_height = int(240 * volume / 100)
+        self.volume_osd_bar_fill.setGeometry(0, 240 - bar_height, 12, bar_height)
+
+    def _position_volume_osd(self):
+        x = 20
+        y = (self.height() - self.volume_osd.height()) // 2
+        self.volume_osd.move(x, y)
+
+    def _show_volume_osd(self, volume):
+        self.volume_osd_label.setText(f"{volume}%")
+        self._update_osd_bar(volume)
+        self._position_volume_osd()
+        self.volume_osd.raise_()
+
+        if not self.volume_osd_showing:
+            self.volume_osd_showing = True
+            self.volume_osd_fade.stop()
+            self.volume_osd_fade.setStartValue(self.volume_osd_opacity.opacity())
+            self.volume_osd_fade.setEndValue(1.0)
+            self.volume_osd_fade.start()
+
+        self.volume_osd_timer.stop()
+        self.volume_osd_timer.start(2000)
+
+    def _fade_out_volume_osd(self):
+        self.volume_osd_showing = False
+        self.volume_osd_fade.stop()
+        self.volume_osd_fade.setStartValue(self.volume_osd_opacity.opacity())
+        self.volume_osd_fade.setEndValue(0.0)
+        self.volume_osd_fade.start()
+
     def on_double_click(self):
         self.exit_fullscreen.emit()
 
@@ -621,6 +693,7 @@ class FullscreenWindow(QWidget):
             new_volume = max(0, self.volume_slider.value() - step)
         self.volume_slider.setValue(new_volume)
         self.volume_change.emit(new_volume)
+        self._show_volume_osd(new_volume)
         event.accept()
 
     def keyPressEvent(self, event):
