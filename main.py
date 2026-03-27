@@ -605,6 +605,11 @@ class FullscreenWindow(QWidget):
         event.accept()
 
     def wheelEvent(self, event: QWheelEvent):
+        widget_under_cursor = QApplication.widgetAt(QCursor.pos())
+        if widget_under_cursor and (widget_under_cursor is self.playlist_mirror or self.playlist_mirror.isAncestorOf(widget_under_cursor)):
+            super().wheelEvent(event)
+            return
+
         delta = event.angleDelta().y()
         step = 5
         if delta > 0:
