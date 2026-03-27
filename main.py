@@ -302,6 +302,7 @@ class FullscreenWindow(QWidget):
     exit_fullscreen = Signal()
     volume_change = Signal(int)
     track_double_clicked = Signal(int)
+    files_dropped = Signal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -309,6 +310,7 @@ class FullscreenWindow(QWidget):
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         self.setMouseTracking(True)
+        self.setAcceptDrops(True)
 
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
@@ -672,6 +674,21 @@ class FullscreenWindow(QWidget):
         self.volume_osd_fade.setEndValue(0.0)
         self.volume_osd_fade.start()
 
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event: QDropEvent):
+        if event.mimeData().hasUrls():
+            files = []
+            for url in event.mimeData().urls():
+                file_path = url.toLocalFile()
+                if file_path.lower().endswith(('.mp3', '.wav', '.flac', '.ogg', '.m4a')):
+                    files.append(file_path)
+            if files:
+                self.files_dropped.emit(files)
+            event.acceptProposedAction()
+
     def on_double_click(self):
         self.exit_fullscreen.emit()
 
@@ -998,6 +1015,7 @@ class MusicPlayer(QMainWindow):
         self.fullscreen_window.progress_slider.sliderReleased.connect(self.on_fullscreen_slider_released)
         self.fullscreen_window.progress_slider.sliderMoved.connect(self.on_slider_moved)
         self.fullscreen_window.track_double_clicked.connect(self.play_track)
+        self.fullscreen_window.files_dropped.connect(self._on_fullscreen_files_dropped)
         self.fullscreen_window.sync_playlist(self.playlist, self.current_index)
 
         self.update_fullscreen_ui()
@@ -1105,6 +1123,11 @@ class MusicPlayer(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, file_path)
             item.setToolTip(file_path)
             self.playlist.addItem(item)
+
+    def _on_fullscreen_files_dropped(self, files):
+        self.add_files(files)
+        if self.fullscreen_window:
+            self.fullscreen_window.sync_playlist(self.playlist, self.current_index)
     
     def on_item_double_clicked(self, item: QListWidgetItem):
         row = self.playlist.row(item)
