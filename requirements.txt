@@ -1,0 +1,6 @@
+numpy
+PyAudio
+PyOpenGL
+PyOpenGL-accelerate
+PySide6
+python-vlc
