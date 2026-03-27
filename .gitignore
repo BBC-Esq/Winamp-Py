@@ -18,6 +18,9 @@ build/
 *.swp
 *.swo
 
+# Assets
+*.png
+
 # OS
 Thumbs.db
 Desktop.ini
