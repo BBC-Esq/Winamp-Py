@@ -724,7 +724,7 @@ class FullscreenWindow(QWidget):
         event.accept()
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Escape:
+        if event.key() == Qt.Key.Key_Escape or (event.key() == Qt.Key.Key_F11 and not event.isAutoRepeat()):
             self.exit_fullscreen.emit()
         else:
             super().keyPressEvent(event)
@@ -818,6 +818,7 @@ class MusicPlayer(QMainWindow):
         
         fullscreen_action = QAction("Toggle Fullscreen", self)
         fullscreen_action.setShortcut("F11")
+        fullscreen_action.setAutoRepeat(False)
         fullscreen_action.triggered.connect(self.toggle_fullscreen)
         vis_menu.addAction(fullscreen_action)
         
