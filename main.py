@@ -52,28 +52,27 @@ class ClickableSlider(QSlider):
                 QStyle.ComplexControl.CC_Slider, opt,
                 QStyle.SubControl.SC_SliderHandle, self
             )
-            
-            if self.orientation() == Qt.Orientation.Horizontal:
-                slider_length = handle_rect.width()
-                slider_min = groove_rect.x()
-                slider_max = groove_rect.right() - slider_length + 1
-                pos = event.position().x()
-            else:
-                slider_length = handle_rect.height()
-                slider_min = groove_rect.y()
-                slider_max = groove_rect.bottom() - slider_length + 1
-                pos = event.position().y()
-            
-            value = QStyle.sliderValueFromPosition(
-                self.minimum(), self.maximum(),
-                int(pos - slider_min), slider_max - slider_min,
-                opt.upsideDown
-            )
-            self.setValue(value)
-            self.sliderMoved.emit(value)
-            event.accept()
-        else:
-            super().mousePressEvent(event)
+
+            if not handle_rect.contains(event.position().toPoint()):
+                if self.orientation() == Qt.Orientation.Horizontal:
+                    slider_length = handle_rect.width()
+                    slider_min = groove_rect.x()
+                    slider_max = groove_rect.right() - slider_length + 1
+                    pos = event.position().x() - slider_length / 2
+                else:
+                    slider_length = handle_rect.height()
+                    slider_min = groove_rect.y()
+                    slider_max = groove_rect.bottom() - slider_length + 1
+                    pos = event.position().y() - slider_length / 2
+
+                value = QStyle.sliderValueFromPosition(
+                    self.minimum(), self.maximum(),
+                    int(pos - slider_min), slider_max - slider_min,
+                    opt.upsideDown
+                )
+                self.setValue(value)
+                self.sliderMoved.emit(value)
+        super().mousePressEvent(event)
 
 
 AudioPlayCb = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint, ctypes.c_int64)
