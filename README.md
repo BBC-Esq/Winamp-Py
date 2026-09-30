@@ -21,7 +21,7 @@ A Winamp-inspired media player built with Python, featuring real-time audio visu
 - Remembers window state, playlist, and settings between sessions
 
 ## ⚙️ Windows Installer
-> Download and run [```WinampPy-Setup.exe```](https://github.com/BBC-Esq/Winamp-Py/releases/latest/download/WinampPy-Setup.exe) from the [latest release](https://github.com/BBC-Esq/Winamp-Py/releases/latest). [VLC media player](https://www.videolan.org/vlc/) must also be installed.
+> Download and run [```WinampPy_Setup.exe```](https://github.com/BBC-Esq/Winamp-Py/releases/latest/download/WinampPy_Setup.exe) from the [latest release](https://github.com/BBC-Esq/Winamp-Py/releases/latest). [VLC media player](https://www.videolan.org/vlc/) must also be installed.
 
 ## Requirements
 
