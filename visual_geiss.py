@@ -637,12 +637,12 @@ class GeissVisualization(QOpenGLWidget):
             if current_time - self.last_beat_time > 0.3:
                 self.last_beat_time = current_time
                 if self.beat_decay:
-                    self.decay = max(0.975, self.decay - 0.01)
+                    self.decay = max(min(0.975, self.base_decay - 0.01), self.decay - 0.01)
                 if self.auto_change and self.next_warp_ready and random.random() < 0.15:
                     self.warp_timer = self.warp_duration
         
         if self.decay < self.base_decay:
-            self.decay += 0.0005
+            self.decay = min(self.base_decay, self.decay + 0.0005)
     
     def initializeGL(self):
         GL.glEnable(GL.GL_BLEND)
