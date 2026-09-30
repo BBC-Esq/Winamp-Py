@@ -195,6 +195,15 @@ class GeissSettingsDialog(QDialog):
         layout.addLayout(button_layout)
     
     def load_current_settings(self):
+        controls = (
+            self.wave_combo, self.palette_combo, self.warp_combo, self.instant_warp_check,
+            self.decay_slider, self.beat_decay_check, self.dither_check, self.dither_slider,
+            self.nebula_check, self.solar_check, self.dots_check, self.grid_check,
+            self.border_check, self.auto_change_check, self.duration_slider,
+        )
+        for control in controls:
+            control.blockSignals(True)
+
         self.wave_combo.setCurrentIndex(self.visualization.wave_mode)
         self.palette_combo.setCurrentIndex(self.visualization.palette_index)
         self.warp_combo.setCurrentIndex(self.visualization.warp_mode)
@@ -217,7 +226,10 @@ class GeissSettingsDialog(QDialog):
         self.auto_change_check.setChecked(self.visualization.auto_change)
         self.duration_slider.setValue(self.visualization.warp_duration)
         self.duration_slider.setEnabled(self.visualization.auto_change)
-    
+
+        for control in controls:
+            control.blockSignals(False)
+
     def on_wave_changed(self, index):
         self.visualization.wave_mode = index
         self.settings_changed.emit()
