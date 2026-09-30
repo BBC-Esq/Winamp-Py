@@ -345,10 +345,11 @@ class GeissVisualization(QOpenGLWidget):
         self.auto_change = True
         
         self.zoom = 1.02
+        self.bass_zoom = 0.0
         self.rotation = 0.005
         self.drift_x = 0.0
         self.drift_y = 0.0
-        
+
         self.target_zoom = 1.02
         self.target_rotation = 0.005
         self.target_drift_x = 0.0
@@ -610,15 +611,18 @@ class GeissVisualization(QOpenGLWidget):
                     self.effect_dots = not self.effect_dots
         
         if self.is_playing:
-            if not self.instant_warp:
+            base_zoom = self.zoom - self.bass_zoom
+            if self.instant_warp:
+                base_zoom = self.target_zoom
+            else:
                 lerp = 0.03
-                self.zoom += (self.target_zoom - self.zoom) * lerp
+                base_zoom += (self.target_zoom - base_zoom) * lerp
                 self.rotation += (self.target_rotation - self.rotation) * lerp
                 self.drift_x += (self.target_drift_x - self.drift_x) * lerp
                 self.drift_y += (self.target_drift_y - self.drift_y) * lerp
-            
-            bass_influence = self.smoothed_bass * 0.005
-            self.zoom = self.target_zoom + bass_influence
+
+            self.bass_zoom = self.smoothed_bass * 0.005
+            self.zoom = base_zoom + self.bass_zoom
         
         self.update()
     
