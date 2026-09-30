@@ -195,6 +195,15 @@ class GeissSettingsDialog(QDialog):
         layout.addLayout(button_layout)
     
     def load_current_settings(self):
+        controls = (
+            self.wave_combo, self.palette_combo, self.warp_combo, self.instant_warp_check,
+            self.decay_slider, self.beat_decay_check, self.dither_check, self.dither_slider,
+            self.nebula_check, self.solar_check, self.dots_check, self.grid_check,
+            self.border_check, self.auto_change_check, self.duration_slider,
+        )
+        for control in controls:
+            control.blockSignals(True)
+
         self.wave_combo.setCurrentIndex(self.visualization.wave_mode)
         self.palette_combo.setCurrentIndex(self.visualization.palette_index)
         self.warp_combo.setCurrentIndex(self.visualization.warp_mode)
@@ -217,7 +226,10 @@ class GeissSettingsDialog(QDialog):
         self.auto_change_check.setChecked(self.visualization.auto_change)
         self.duration_slider.setValue(self.visualization.warp_duration)
         self.duration_slider.setEnabled(self.visualization.auto_change)
-    
+
+        for control in controls:
+            control.blockSignals(False)
+
     def on_wave_changed(self, index):
         self.visualization.wave_mode = index
         self.settings_changed.emit()
@@ -333,10 +345,11 @@ class GeissVisualization(QOpenGLWidget):
         self.auto_change = True
         
         self.zoom = 1.02
+        self.bass_zoom = 0.0
         self.rotation = 0.005
         self.drift_x = 0.0
         self.drift_y = 0.0
-        
+
         self.target_zoom = 1.02
         self.target_rotation = 0.005
         self.target_drift_x = 0.0
@@ -598,15 +611,18 @@ class GeissVisualization(QOpenGLWidget):
                     self.effect_dots = not self.effect_dots
         
         if self.is_playing:
-            if not self.instant_warp:
+            base_zoom = self.zoom - self.bass_zoom
+            if self.instant_warp:
+                base_zoom = self.target_zoom
+            else:
                 lerp = 0.03
-                self.zoom += (self.target_zoom - self.zoom) * lerp
+                base_zoom += (self.target_zoom - base_zoom) * lerp
                 self.rotation += (self.target_rotation - self.rotation) * lerp
                 self.drift_x += (self.target_drift_x - self.drift_x) * lerp
                 self.drift_y += (self.target_drift_y - self.drift_y) * lerp
-            
-            bass_influence = self.smoothed_bass * 0.005
-            self.zoom = self.target_zoom + bass_influence
+
+            self.bass_zoom = self.smoothed_bass * 0.005
+            self.zoom = base_zoom + self.bass_zoom
         
         self.update()
     
@@ -625,12 +641,12 @@ class GeissVisualization(QOpenGLWidget):
             if current_time - self.last_beat_time > 0.3:
                 self.last_beat_time = current_time
                 if self.beat_decay:
-                    self.decay = max(0.975, self.decay - 0.01)
+                    self.decay = max(min(0.975, self.base_decay - 0.01), self.decay - 0.01)
                 if self.auto_change and self.next_warp_ready and random.random() < 0.15:
                     self.warp_timer = self.warp_duration
         
         if self.decay < self.base_decay:
-            self.decay += 0.0005
+            self.decay = min(self.base_decay, self.decay + 0.0005)
     
     def initializeGL(self):
         GL.glEnable(GL.GL_BLEND)
@@ -648,11 +664,12 @@ class GeissVisualization(QOpenGLWidget):
         size = 256
         noise = np.random.rand(size, size).astype(np.float32)
         noise = (noise - 0.5) * 2.0
-        
+        noise = np.repeat(noise[:, :, None], 3, axis=2)
+
         self.dither_texture = GL.glGenTextures(1)
         GL.glBindTexture(GL.GL_TEXTURE_2D, self.dither_texture)
-        GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_R32F, size, size, 0, 
-                        GL.GL_RED, GL.GL_FLOAT, noise)
+        GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGB32F, size, size, 0,
+                        GL.GL_RGB, GL.GL_FLOAT, noise)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_LINEAR)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_S, GL.GL_REPEAT)
@@ -686,7 +703,9 @@ class GeissVisualization(QOpenGLWidget):
     def paintGL(self):
         if self.fbo1 is None or self.fbo2 is None:
             return
-        
+
+        screen_viewport = [int(v) for v in GL.glGetIntegerv(GL.GL_VIEWPORT)]
+
         source_fbo = self.fbo1 if self.current_fbo == 0 else self.fbo2
         dest_fbo = self.fbo2 if self.current_fbo == 0 else self.fbo1
         
@@ -719,8 +738,8 @@ class GeissVisualization(QOpenGLWidget):
             self.draw_border_effect()
         
         dest_fbo.release()
-        
-        GL.glViewport(0, 0, self.width(), self.height())
+
+        GL.glViewport(*screen_viewport)
         GL.glClearColor(0.0, 0.0, 0.0, 1.0)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
         
@@ -789,27 +808,36 @@ class GeissVisualization(QOpenGLWidget):
         GL.glBindTexture(GL.GL_TEXTURE_2D, self.dither_texture)
         
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE)
-        
+        GL.glColorMask(GL.GL_TRUE, GL.GL_TRUE, GL.GL_TRUE, GL.GL_FALSE)
+
         offset_x = (self.dither_offset * 0.1) % 1.0
         offset_y = (self.dither_offset * 0.073) % 1.0
-        
+
         scale = 4.0
-        
+
         dither_strength = self.dither_amount * (0.8 + self.smoothed_mid * 0.4)
-        
+
         GL.glColor4f(dither_strength, dither_strength, dither_strength, 1.0)
-        
-        GL.glBegin(GL.GL_QUADS)
-        GL.glTexCoord2f(offset_x, offset_y)
-        GL.glVertex2f(-1, -1)
-        GL.glTexCoord2f(offset_x + scale, offset_y)
-        GL.glVertex2f(1, -1)
-        GL.glTexCoord2f(offset_x + scale, offset_y + scale)
-        GL.glVertex2f(1, 1)
-        GL.glTexCoord2f(offset_x, offset_y + scale)
-        GL.glVertex2f(-1, 1)
-        GL.glEnd()
-        
+
+        passes = (
+            (GL.GL_FUNC_ADD, offset_x, offset_y),
+            (GL.GL_FUNC_REVERSE_SUBTRACT, offset_x + 0.5, offset_y + 0.5),
+        )
+        for equation, tex_x, tex_y in passes:
+            GL.glBlendEquation(equation)
+            GL.glBegin(GL.GL_QUADS)
+            GL.glTexCoord2f(tex_x, tex_y)
+            GL.glVertex2f(-1, -1)
+            GL.glTexCoord2f(tex_x + scale, tex_y)
+            GL.glVertex2f(1, -1)
+            GL.glTexCoord2f(tex_x + scale, tex_y + scale)
+            GL.glVertex2f(1, 1)
+            GL.glTexCoord2f(tex_x, tex_y + scale)
+            GL.glVertex2f(-1, 1)
+            GL.glEnd()
+
+        GL.glBlendEquation(GL.GL_FUNC_ADD)
+        GL.glColorMask(GL.GL_TRUE, GL.GL_TRUE, GL.GL_TRUE, GL.GL_TRUE)
         GL.glDisable(GL.GL_TEXTURE_2D)
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
     
@@ -1137,10 +1165,15 @@ class GeissVisualization(QOpenGLWidget):
     def cleanup(self):
         self.animation_timer.stop()
         self.save_settings()
-        
-        if self.dither_texture is not None:
-            GL.glDeleteTextures([self.dither_texture])
-            self.dither_texture = None
-        
+
+        if self.context() is not None:
+            self.makeCurrent()
+            if self.dither_texture is not None:
+                GL.glDeleteTextures([self.dither_texture])
+            self.fbo1 = None
+            self.fbo2 = None
+            self.doneCurrent()
+
+        self.dither_texture = None
         self.fbo1 = None
         self.fbo2 = None

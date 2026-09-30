@@ -15,10 +15,13 @@ A Winamp-inspired media player built with Python, featuring real-time audio visu
 - Play MP3, WAV, FLAC, OGG, and M4A files
 - Drag-and-drop playlist with reordering
 - Real-time OpenGL visualizations (Geiss-style) with 8 waveform modes and 8 color palettes
-- Fullscreen visualization mode (double-click the visualizer)
-- Customizable visualization settings (trails, glow, particles, colors)
+- Fullscreen visualization mode (double-click the visualizer or press F11)
+- Customizable visualization settings (waveform, colors, warp motion, trails, particle effects)
 - Volume control and seek bar
 - Remembers window state, playlist, and settings between sessions
+
+## ⚙️ Windows Installer
+> Download and run [```WinampPy-Setup.exe```](https://github.com/BBC-Esq/Winamp-Py/releases/latest/download/WinampPy-Setup.exe) from the [latest release](https://github.com/BBC-Esq/Winamp-Py/releases/latest). [VLC media player](https://www.videolan.org/vlc/) must also be installed.
 
 ## Requirements
 
@@ -55,6 +58,6 @@ A Winamp-inspired media player built with Python, featuring real-time audio visu
 - **Playback** - use the transport buttons or double-click a track
 - **Reorder** - drag tracks within the playlist
 - **Remove tracks** - right-click a track
-- **Visualization** - select a visualization from the View menu; double-click it for fullscreen (Escape to exit)
-- **Settings** - View > Visualization Settings to adjust trails, glow, colors, and effects
+- **Visualization** - select a visualization from the Visualization menu; double-click it or press F11 for fullscreen (double-click, Esc or F11 to exit)
+- **Settings** - Visualization > Visualization Settings (or right-click the visualizer) to adjust the waveform, colors, warp motion, trails, and effects
 - **Volume** - use the slider or mouse wheel

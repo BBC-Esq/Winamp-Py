@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QGraphicsOpacityEffect,
 )
+from shiboken6 import isValid
 
 from visual_geiss import GeissVisualization
 
@@ -52,28 +53,27 @@ class ClickableSlider(QSlider):
                 QStyle.ComplexControl.CC_Slider, opt,
                 QStyle.SubControl.SC_SliderHandle, self
             )
-            
-            if self.orientation() == Qt.Orientation.Horizontal:
-                slider_length = handle_rect.width()
-                slider_min = groove_rect.x()
-                slider_max = groove_rect.right() - slider_length + 1
-                pos = event.position().x()
-            else:
-                slider_length = handle_rect.height()
-                slider_min = groove_rect.y()
-                slider_max = groove_rect.bottom() - slider_length + 1
-                pos = event.position().y()
-            
-            value = QStyle.sliderValueFromPosition(
-                self.minimum(), self.maximum(),
-                int(pos - slider_min), slider_max - slider_min,
-                opt.upsideDown
-            )
-            self.setValue(value)
-            self.sliderMoved.emit(value)
-            event.accept()
-        else:
-            super().mousePressEvent(event)
+
+            if not handle_rect.contains(event.position().toPoint()):
+                if self.orientation() == Qt.Orientation.Horizontal:
+                    slider_length = handle_rect.width()
+                    slider_min = groove_rect.x()
+                    slider_max = groove_rect.right() - slider_length + 1
+                    pos = event.position().x() - slider_length / 2
+                else:
+                    slider_length = handle_rect.height()
+                    slider_min = groove_rect.y()
+                    slider_max = groove_rect.bottom() - slider_length + 1
+                    pos = event.position().y() - slider_length / 2
+
+                value = QStyle.sliderValueFromPosition(
+                    self.minimum(), self.maximum(),
+                    int(pos - slider_min), slider_max - slider_min,
+                    opt.upsideDown
+                )
+                self.setValue(value)
+                self.sliderMoved.emit(value)
+        super().mousePressEvent(event)
 
 
 AudioPlayCb = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint, ctypes.c_int64)
@@ -120,8 +120,7 @@ class AudioAnalyzer:
             samples_array = np.frombuffer(audio_data, dtype=np.int16).copy()
             
             if self.volume != 1.0:
-                samples_array = (samples_array * self.volume).astype(np.int16)
-                audio_data = samples_array.tobytes()
+                audio_data = (samples_array * self.volume).astype(np.int16).tobytes()
             
             if self.stream and self.stream.is_active():
                 self.stream.write(audio_data)
@@ -241,6 +240,11 @@ class AudioAnalyzer:
         self.pyaudio_instance.terminate()
 
 
+def accept_as_copy(event):
+    event.setDropAction(Qt.DropAction.CopyAction)
+    event.accept()
+
+
 class PlaylistWidget(QListWidget):
     
     files_dropped = Signal(list)
@@ -259,13 +263,13 @@ class PlaylistWidget(QListWidget):
     
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
-            event.acceptProposedAction()
+            accept_as_copy(event)
         else:
             super().dragEnterEvent(event)
-    
+
     def dragMoveEvent(self, event):
         if event.mimeData().hasUrls():
-            event.acceptProposedAction()
+            accept_as_copy(event)
         else:
             super().dragMoveEvent(event)
     
@@ -278,7 +282,7 @@ class PlaylistWidget(QListWidget):
                     files.append(file_path)
             if files:
                 self.files_dropped.emit(files)
-            event.acceptProposedAction()
+            accept_as_copy(event)
         else:
             super().dropEvent(event)
     
@@ -571,6 +575,10 @@ class FullscreenWindow(QWidget):
 
         global_pos = QCursor.pos()
         if not self.geometry().contains(global_pos):
+            if self.panel_visible:
+                self.mouse_in_panel = False
+                if not self.hide_timer.isActive():
+                    self.hide_timer.start(1500)
             return
 
         local_pos = self.mapFromGlobal(global_pos)
@@ -626,7 +634,7 @@ class FullscreenWindow(QWidget):
     def _on_animation_finished(self):
         self.panel_animating = False
         if not self.panel_visible:
-            pass
+            self._reset_cursor_timer()
 
     def _on_hide_timeout(self):
         if self.panel_visible and not self.mouse_in_panel:
@@ -676,7 +684,7 @@ class FullscreenWindow(QWidget):
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
-            event.acceptProposedAction()
+            accept_as_copy(event)
 
     def dropEvent(self, event: QDropEvent):
         if event.mimeData().hasUrls():
@@ -687,7 +695,12 @@ class FullscreenWindow(QWidget):
                     files.append(file_path)
             if files:
                 self.files_dropped.emit(files)
-            event.acceptProposedAction()
+            accept_as_copy(event)
+
+    def closeEvent(self, event):
+        if self.visualizer is not None:
+            self.exit_fullscreen.emit()
+        super().closeEvent(event)
 
     def on_double_click(self):
         self.exit_fullscreen.emit()
@@ -714,7 +727,7 @@ class FullscreenWindow(QWidget):
         event.accept()
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Escape:
+        if event.key() == Qt.Key.Key_Escape or (event.key() == Qt.Key.Key_F11 and not event.isAutoRepeat()):
             self.exit_fullscreen.emit()
         else:
             super().keyPressEvent(event)
@@ -748,8 +761,9 @@ class MusicPlayer(QMainWindow):
         )
         
         self.current_index = -1
+        self.current_item = None
         self.is_playing = False
-        
+
         self.current_visualization_index = 0
         self.visualizer = None
         
@@ -807,6 +821,7 @@ class MusicPlayer(QMainWindow):
         
         fullscreen_action = QAction("Toggle Fullscreen", self)
         fullscreen_action.setShortcut("F11")
+        fullscreen_action.setAutoRepeat(False)
         fullscreen_action.triggered.connect(self.toggle_fullscreen)
         vis_menu.addAction(fullscreen_action)
         
@@ -1016,7 +1031,7 @@ class MusicPlayer(QMainWindow):
         self.fullscreen_window.progress_slider.sliderMoved.connect(self.on_slider_moved)
         self.fullscreen_window.track_double_clicked.connect(self.play_track)
         self.fullscreen_window.files_dropped.connect(self._on_fullscreen_files_dropped)
-        self.fullscreen_window.sync_playlist(self.playlist, self.current_index)
+        self.fullscreen_window.sync_playlist(self.playlist, self.current_row())
 
         self.update_fullscreen_ui()
 
@@ -1047,9 +1062,8 @@ class MusicPlayer(QMainWindow):
         if not self.fullscreen_window:
             return
 
-        if self.current_index >= 0 and self.current_index < self.playlist.count():
-            item = self.playlist.item(self.current_index)
-            self.fullscreen_window.now_playing_label.setText(f"Now playing: {item.text()}")
+        if self.current_item is not None and isValid(self.current_item):
+            self.fullscreen_window.now_playing_label.setText(f"Now playing: {self.current_item.text()}")
         else:
             self.fullscreen_window.now_playing_label.setText("No track playing")
 
@@ -1058,7 +1072,7 @@ class MusicPlayer(QMainWindow):
         self.fullscreen_window.duration_label.setText(self.duration_label.text())
         self.fullscreen_window.progress_slider.setValue(self.progress_slider.value())
         self.fullscreen_window.volume_value_label.setText(self.volume_value_label.text())
-        self.fullscreen_window.update_playlist_selection(self.current_index)
+        self.fullscreen_window.update_playlist_selection(self.current_row())
     
     def open_files(self):
         files, _ = QFileDialog.getOpenFileNames(
@@ -1072,9 +1086,17 @@ class MusicPlayer(QMainWindow):
     
     def clear_playlist(self):
         self.stop()
+        self.unload_track()
         self.playlist.clear()
-        self.current_index = -1
         self.now_playing_label.setText("Drag and drop music files to begin")
+
+    def unload_track(self):
+        self.player.set_media(None)
+        self.current_index = -1
+        self.current_item = None
+        self.duration_label.setText("0:00")
+        if self.fullscreen_window:
+            self.fullscreen_window.duration_label.setText("0:00")
     
     def setup_timer(self):
         self.timer = QTimer()
@@ -1127,7 +1149,7 @@ class MusicPlayer(QMainWindow):
     def _on_fullscreen_files_dropped(self, files):
         self.add_files(files)
         if self.fullscreen_window:
-            self.fullscreen_window.sync_playlist(self.playlist, self.current_index)
+            self.fullscreen_window.sync_playlist(self.playlist, self.current_row())
     
     def on_item_double_clicked(self, item: QListWidgetItem):
         row = self.playlist.row(item)
@@ -1145,6 +1167,7 @@ class MusicPlayer(QMainWindow):
             self.player.play()
             
             self.current_index = index
+            self.current_item = item
             self.is_playing = True
             if self.visualizer:
                 self.visualizer.set_playing(True)
@@ -1211,7 +1234,7 @@ class MusicPlayer(QMainWindow):
     def play_previous(self):
         if self.playlist.count() == 0:
             return
-        prev_index = self.current_index - 1
+        prev_index = self.current_index - 1 if self.current_row() >= 0 else self.current_index
         if prev_index >= 0:
             self.play_track(prev_index)
     
@@ -1278,19 +1301,29 @@ class MusicPlayer(QMainWindow):
             return f"{hours}:{minutes % 60:02d}:{seconds % 60:02d}"
         return f"{minutes}:{seconds % 60:02d}"
     
-    def on_playlist_changed(self):
+    def on_playlist_changed(self, parent, first, last):
         if self.playlist.count() == 0:
-            self.current_index = -1
             self.stop()
+            self.unload_track()
             self.now_playing_label.setText("Queue is empty")
-        elif self.current_index >= self.playlist.count():
-            self.current_index = self.playlist.count() - 1
+            return
+        row = self.current_row()
+        if row >= 0:
+            self.current_index = row
+        elif self.current_index > last:
+            self.current_index -= last - first + 1
+        elif self.current_index >= first:
+            self.current_index = first - 1
     
+    def current_row(self):
+        if self.current_item is None or not isValid(self.current_item):
+            return -1
+        return self.playlist.row(self.current_item)
+
     def on_rows_moved(self):
-        if self.current_index >= 0 and self.player.get_media():
-            current_item = self.playlist.currentItem()
-            if current_item:
-                self.current_index = self.playlist.row(current_item)
+        row = self.current_row()
+        if row >= 0:
+            self.current_index = row
     
     def wheelEvent(self, event: QWheelEvent):
         widget_under_cursor = QApplication.widgetAt(QCursor.pos())
@@ -1312,12 +1345,12 @@ class MusicPlayer(QMainWindow):
     def closeEvent(self, event):
         if self.is_fullscreen:
             self.exit_fullscreen()
-        
-        if self.visualizer:
-            self.visualizer.save_settings()
-            self.visualizer.cleanup()
-        
+
         self.save_settings()
+
+        if self.visualizer:
+            self.visualizer.cleanup()
+
         self.player.stop()
         self.audio_analyzer.cleanup()
         event.accept()
