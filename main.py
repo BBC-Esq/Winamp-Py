@@ -1077,10 +1077,17 @@ class MusicPlayer(QMainWindow):
     
     def clear_playlist(self):
         self.stop()
+        self.unload_track()
         self.playlist.clear()
+        self.now_playing_label.setText("Drag and drop music files to begin")
+
+    def unload_track(self):
+        self.player.set_media(None)
         self.current_index = -1
         self.current_item = None
-        self.now_playing_label.setText("Drag and drop music files to begin")
+        self.duration_label.setText("0:00")
+        if self.fullscreen_window:
+            self.fullscreen_window.duration_label.setText("0:00")
     
     def setup_timer(self):
         self.timer = QTimer()
@@ -1287,8 +1294,8 @@ class MusicPlayer(QMainWindow):
     
     def on_playlist_changed(self, parent, first, last):
         if self.playlist.count() == 0:
-            self.current_index = -1
             self.stop()
+            self.unload_track()
             self.now_playing_label.setText("Queue is empty")
             return
         row = self.current_row()
