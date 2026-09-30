@@ -576,6 +576,10 @@ class FullscreenWindow(QWidget):
 
         global_pos = QCursor.pos()
         if not self.geometry().contains(global_pos):
+            if self.panel_visible:
+                self.mouse_in_panel = False
+                if not self.hide_timer.isActive():
+                    self.hide_timer.start(1500)
             return
 
         local_pos = self.mapFromGlobal(global_pos)
