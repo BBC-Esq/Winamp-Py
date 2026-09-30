@@ -698,7 +698,9 @@ class GeissVisualization(QOpenGLWidget):
     def paintGL(self):
         if self.fbo1 is None or self.fbo2 is None:
             return
-        
+
+        screen_viewport = [int(v) for v in GL.glGetIntegerv(GL.GL_VIEWPORT)]
+
         source_fbo = self.fbo1 if self.current_fbo == 0 else self.fbo2
         dest_fbo = self.fbo2 if self.current_fbo == 0 else self.fbo1
         
@@ -731,8 +733,8 @@ class GeissVisualization(QOpenGLWidget):
             self.draw_border_effect()
         
         dest_fbo.release()
-        
-        GL.glViewport(0, 0, self.width(), self.height())
+
+        GL.glViewport(*screen_viewport)
         GL.glClearColor(0.0, 0.0, 0.0, 1.0)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
         
