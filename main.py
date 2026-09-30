@@ -241,6 +241,11 @@ class AudioAnalyzer:
         self.pyaudio_instance.terminate()
 
 
+def accept_as_copy(event):
+    event.setDropAction(Qt.DropAction.CopyAction)
+    event.accept()
+
+
 class PlaylistWidget(QListWidget):
     
     files_dropped = Signal(list)
@@ -259,13 +264,13 @@ class PlaylistWidget(QListWidget):
     
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
-            event.acceptProposedAction()
+            accept_as_copy(event)
         else:
             super().dragEnterEvent(event)
-    
+
     def dragMoveEvent(self, event):
         if event.mimeData().hasUrls():
-            event.acceptProposedAction()
+            accept_as_copy(event)
         else:
             super().dragMoveEvent(event)
     
@@ -278,7 +283,7 @@ class PlaylistWidget(QListWidget):
                     files.append(file_path)
             if files:
                 self.files_dropped.emit(files)
-            event.acceptProposedAction()
+            accept_as_copy(event)
         else:
             super().dropEvent(event)
     
@@ -676,7 +681,7 @@ class FullscreenWindow(QWidget):
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
-            event.acceptProposedAction()
+            accept_as_copy(event)
 
     def dropEvent(self, event: QDropEvent):
         if event.mimeData().hasUrls():
@@ -687,7 +692,7 @@ class FullscreenWindow(QWidget):
                     files.append(file_path)
             if files:
                 self.files_dropped.emit(files)
-            event.acceptProposedAction()
+            accept_as_copy(event)
 
     def on_double_click(self):
         self.exit_fullscreen.emit()
