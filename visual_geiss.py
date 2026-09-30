@@ -664,11 +664,12 @@ class GeissVisualization(QOpenGLWidget):
         size = 256
         noise = np.random.rand(size, size).astype(np.float32)
         noise = (noise - 0.5) * 2.0
-        
+        noise = np.repeat(noise[:, :, None], 3, axis=2)
+
         self.dither_texture = GL.glGenTextures(1)
         GL.glBindTexture(GL.GL_TEXTURE_2D, self.dither_texture)
-        GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_R32F, size, size, 0, 
-                        GL.GL_RED, GL.GL_FLOAT, noise)
+        GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGB32F, size, size, 0,
+                        GL.GL_RGB, GL.GL_FLOAT, noise)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_LINEAR)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_S, GL.GL_REPEAT)
@@ -807,27 +808,36 @@ class GeissVisualization(QOpenGLWidget):
         GL.glBindTexture(GL.GL_TEXTURE_2D, self.dither_texture)
         
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE)
-        
+        GL.glColorMask(GL.GL_TRUE, GL.GL_TRUE, GL.GL_TRUE, GL.GL_FALSE)
+
         offset_x = (self.dither_offset * 0.1) % 1.0
         offset_y = (self.dither_offset * 0.073) % 1.0
-        
+
         scale = 4.0
-        
+
         dither_strength = self.dither_amount * (0.8 + self.smoothed_mid * 0.4)
-        
+
         GL.glColor4f(dither_strength, dither_strength, dither_strength, 1.0)
-        
-        GL.glBegin(GL.GL_QUADS)
-        GL.glTexCoord2f(offset_x, offset_y)
-        GL.glVertex2f(-1, -1)
-        GL.glTexCoord2f(offset_x + scale, offset_y)
-        GL.glVertex2f(1, -1)
-        GL.glTexCoord2f(offset_x + scale, offset_y + scale)
-        GL.glVertex2f(1, 1)
-        GL.glTexCoord2f(offset_x, offset_y + scale)
-        GL.glVertex2f(-1, 1)
-        GL.glEnd()
-        
+
+        passes = (
+            (GL.GL_FUNC_ADD, offset_x, offset_y),
+            (GL.GL_FUNC_REVERSE_SUBTRACT, offset_x + 0.5, offset_y + 0.5),
+        )
+        for equation, tex_x, tex_y in passes:
+            GL.glBlendEquation(equation)
+            GL.glBegin(GL.GL_QUADS)
+            GL.glTexCoord2f(tex_x, tex_y)
+            GL.glVertex2f(-1, -1)
+            GL.glTexCoord2f(tex_x + scale, tex_y)
+            GL.glVertex2f(1, -1)
+            GL.glTexCoord2f(tex_x + scale, tex_y + scale)
+            GL.glVertex2f(1, 1)
+            GL.glTexCoord2f(tex_x, tex_y + scale)
+            GL.glVertex2f(-1, 1)
+            GL.glEnd()
+
+        GL.glBlendEquation(GL.GL_FUNC_ADD)
+        GL.glColorMask(GL.GL_TRUE, GL.GL_TRUE, GL.GL_TRUE, GL.GL_TRUE)
         GL.glDisable(GL.GL_TEXTURE_2D)
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
     
