@@ -1137,10 +1137,15 @@ class GeissVisualization(QOpenGLWidget):
     def cleanup(self):
         self.animation_timer.stop()
         self.save_settings()
-        
-        if self.dither_texture is not None:
-            GL.glDeleteTextures([self.dither_texture])
-            self.dither_texture = None
-        
+
+        if self.context() is not None:
+            self.makeCurrent()
+            if self.dither_texture is not None:
+                GL.glDeleteTextures([self.dither_texture])
+            self.fbo1 = None
+            self.fbo2 = None
+            self.doneCurrent()
+
+        self.dither_texture = None
         self.fbo1 = None
         self.fbo2 = None

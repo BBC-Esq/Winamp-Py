@@ -1317,12 +1317,12 @@ class MusicPlayer(QMainWindow):
     def closeEvent(self, event):
         if self.is_fullscreen:
             self.exit_fullscreen()
-        
-        if self.visualizer:
-            self.visualizer.save_settings()
-            self.visualizer.cleanup()
-        
+
         self.save_settings()
+
+        if self.visualizer:
+            self.visualizer.cleanup()
+
         self.player.stop()
         self.audio_analyzer.cleanup()
         event.accept()
