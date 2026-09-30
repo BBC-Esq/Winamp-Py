@@ -694,6 +694,11 @@ class FullscreenWindow(QWidget):
                 self.files_dropped.emit(files)
             accept_as_copy(event)
 
+    def closeEvent(self, event):
+        if self.visualizer is not None:
+            self.exit_fullscreen.emit()
+        super().closeEvent(event)
+
     def on_double_click(self):
         self.exit_fullscreen.emit()
 
