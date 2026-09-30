@@ -120,8 +120,7 @@ class AudioAnalyzer:
             samples_array = np.frombuffer(audio_data, dtype=np.int16).copy()
             
             if self.volume != 1.0:
-                samples_array = (samples_array * self.volume).astype(np.int16)
-                audio_data = samples_array.tobytes()
+                audio_data = (samples_array * self.volume).astype(np.int16).tobytes()
             
             if self.stream and self.stream.is_active():
                 self.stream.write(audio_data)
