@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QGraphicsOpacityEffect,
 )
+from shiboken6 import isValid
 
 from visual_geiss import GeissVisualization
 
@@ -752,8 +753,9 @@ class MusicPlayer(QMainWindow):
         )
         
         self.current_index = -1
+        self.current_item = None
         self.is_playing = False
-        
+
         self.current_visualization_index = 0
         self.visualizer = None
         
@@ -1078,6 +1080,7 @@ class MusicPlayer(QMainWindow):
         self.stop()
         self.playlist.clear()
         self.current_index = -1
+        self.current_item = None
         self.now_playing_label.setText("Drag and drop music files to begin")
     
     def setup_timer(self):
@@ -1149,6 +1152,7 @@ class MusicPlayer(QMainWindow):
             self.player.play()
             
             self.current_index = index
+            self.current_item = item
             self.is_playing = True
             if self.visualizer:
                 self.visualizer.set_playing(True)
@@ -1290,11 +1294,15 @@ class MusicPlayer(QMainWindow):
         elif self.current_index >= self.playlist.count():
             self.current_index = self.playlist.count() - 1
     
+    def current_row(self):
+        if self.current_item is None or not isValid(self.current_item):
+            return -1
+        return self.playlist.row(self.current_item)
+
     def on_rows_moved(self):
-        if self.current_index >= 0 and self.player.get_media():
-            current_item = self.playlist.currentItem()
-            if current_item:
-                self.current_index = self.playlist.row(current_item)
+        row = self.current_row()
+        if row >= 0:
+            self.current_index = row
     
     def wheelEvent(self, event: QWheelEvent):
         widget_under_cursor = QApplication.widgetAt(QCursor.pos())
