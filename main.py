@@ -631,7 +631,7 @@ class FullscreenWindow(QWidget):
     def _on_animation_finished(self):
         self.panel_animating = False
         if not self.panel_visible:
-            pass
+            self._reset_cursor_timer()
 
     def _on_hide_timeout(self):
         if self.panel_visible and not self.mouse_in_panel:
