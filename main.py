@@ -1022,7 +1022,7 @@ class MusicPlayer(QMainWindow):
         self.fullscreen_window.progress_slider.sliderMoved.connect(self.on_slider_moved)
         self.fullscreen_window.track_double_clicked.connect(self.play_track)
         self.fullscreen_window.files_dropped.connect(self._on_fullscreen_files_dropped)
-        self.fullscreen_window.sync_playlist(self.playlist, self.current_index)
+        self.fullscreen_window.sync_playlist(self.playlist, self.current_row())
 
         self.update_fullscreen_ui()
 
@@ -1053,9 +1053,8 @@ class MusicPlayer(QMainWindow):
         if not self.fullscreen_window:
             return
 
-        if self.current_index >= 0 and self.current_index < self.playlist.count():
-            item = self.playlist.item(self.current_index)
-            self.fullscreen_window.now_playing_label.setText(f"Now playing: {item.text()}")
+        if self.current_item is not None and isValid(self.current_item):
+            self.fullscreen_window.now_playing_label.setText(f"Now playing: {self.current_item.text()}")
         else:
             self.fullscreen_window.now_playing_label.setText("No track playing")
 
@@ -1064,7 +1063,7 @@ class MusicPlayer(QMainWindow):
         self.fullscreen_window.duration_label.setText(self.duration_label.text())
         self.fullscreen_window.progress_slider.setValue(self.progress_slider.value())
         self.fullscreen_window.volume_value_label.setText(self.volume_value_label.text())
-        self.fullscreen_window.update_playlist_selection(self.current_index)
+        self.fullscreen_window.update_playlist_selection(self.current_row())
     
     def open_files(self):
         files, _ = QFileDialog.getOpenFileNames(
@@ -1134,7 +1133,7 @@ class MusicPlayer(QMainWindow):
     def _on_fullscreen_files_dropped(self, files):
         self.add_files(files)
         if self.fullscreen_window:
-            self.fullscreen_window.sync_playlist(self.playlist, self.current_index)
+            self.fullscreen_window.sync_playlist(self.playlist, self.current_row())
     
     def on_item_double_clicked(self, item: QListWidgetItem):
         row = self.playlist.row(item)
@@ -1219,7 +1218,7 @@ class MusicPlayer(QMainWindow):
     def play_previous(self):
         if self.playlist.count() == 0:
             return
-        prev_index = self.current_index - 1
+        prev_index = self.current_index - 1 if self.current_row() >= 0 else self.current_index
         if prev_index >= 0:
             self.play_track(prev_index)
     
@@ -1286,13 +1285,19 @@ class MusicPlayer(QMainWindow):
             return f"{hours}:{minutes % 60:02d}:{seconds % 60:02d}"
         return f"{minutes}:{seconds % 60:02d}"
     
-    def on_playlist_changed(self):
+    def on_playlist_changed(self, parent, first, last):
         if self.playlist.count() == 0:
             self.current_index = -1
             self.stop()
             self.now_playing_label.setText("Queue is empty")
-        elif self.current_index >= self.playlist.count():
-            self.current_index = self.playlist.count() - 1
+            return
+        row = self.current_row()
+        if row >= 0:
+            self.current_index = row
+        elif self.current_index > last:
+            self.current_index -= last - first + 1
+        elif self.current_index >= first:
+            self.current_index = first - 1
     
     def current_row(self):
         if self.current_item is None or not isValid(self.current_item):
