@@ -306,6 +306,7 @@ class FullscreenWindow(QWidget):
     exit_fullscreen = Signal()
     volume_change = Signal(int)
     track_double_clicked = Signal(int)
+    track_remove_requested = Signal(int)
     files_dropped = Signal(list)
 
     def __init__(self, parent=None):
@@ -448,6 +449,8 @@ class FullscreenWindow(QWidget):
         self.playlist_mirror = QListWidget()
         self.playlist_mirror.setMouseTracking(True)
         self.playlist_mirror.itemDoubleClicked.connect(self._on_playlist_double_click)
+        self.playlist_mirror.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.playlist_mirror.customContextMenuRequested.connect(self._show_playlist_menu)
         panel_layout.addWidget(self.playlist_mirror, 1)
 
         hint_label = QLabel("Double-click to exit fullscreen • ESC to exit")
@@ -518,7 +521,20 @@ class FullscreenWindow(QWidget):
         row = self.playlist_mirror.row(item)
         self.track_double_clicked.emit(row)
 
+    def _show_playlist_menu(self, position):
+        item = self.playlist_mirror.itemAt(position)
+        if item is None:
+            return
+        row = self.playlist_mirror.row(item)
+        menu = QMenu(self)
+        remove_action = menu.addAction("Remove from queue")
+        chosen = menu.exec(self.playlist_mirror.viewport().mapToGlobal(position))
+        menu.deleteLater()
+        if chosen == remove_action:
+            self.track_remove_requested.emit(row)
+
     def sync_playlist(self, playlist_widget, current_index):
+        scroll = self.playlist_mirror.verticalScrollBar().value()
         self.playlist_mirror.clear()
         for i in range(playlist_widget.count()):
             source_item = playlist_widget.item(i)
@@ -527,6 +543,8 @@ class FullscreenWindow(QWidget):
             self.playlist_mirror.addItem(mirror_item)
         if 0 <= current_index < self.playlist_mirror.count():
             self.playlist_mirror.setCurrentRow(current_index)
+        self.playlist_mirror.doItemsLayout()
+        self.playlist_mirror.verticalScrollBar().setValue(scroll)
 
     def update_playlist_selection(self, index):
         if 0 <= index < self.playlist_mirror.count():
@@ -571,6 +589,10 @@ class FullscreenWindow(QWidget):
 
     def _poll_mouse_position(self):
         if not self.isVisible():
+            return
+
+        if QApplication.activePopupWidget() is not None:
+            self.hide_timer.stop()
             return
 
         global_pos = QCursor.pos()
@@ -1030,7 +1052,8 @@ class MusicPlayer(QMainWindow):
         self.fullscreen_window.progress_slider.sliderReleased.connect(self.on_fullscreen_slider_released)
         self.fullscreen_window.progress_slider.sliderMoved.connect(self.on_slider_moved)
         self.fullscreen_window.track_double_clicked.connect(self.play_track)
-        self.fullscreen_window.files_dropped.connect(self._on_fullscreen_files_dropped)
+        self.fullscreen_window.track_remove_requested.connect(self.remove_track)
+        self.fullscreen_window.files_dropped.connect(self.add_files)
         self.fullscreen_window.sync_playlist(self.playlist, self.current_row())
 
         self.update_fullscreen_ui()
@@ -1089,6 +1112,7 @@ class MusicPlayer(QMainWindow):
         self.unload_track()
         self.playlist.clear()
         self.now_playing_label.setText("Drag and drop music files to begin")
+        self.refresh_fullscreen_playlist()
 
     def unload_track(self):
         self.player.set_media(None)
@@ -1145,11 +1169,17 @@ class MusicPlayer(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, file_path)
             item.setToolTip(file_path)
             self.playlist.addItem(item)
+        self.refresh_fullscreen_playlist()
 
-    def _on_fullscreen_files_dropped(self, files):
-        self.add_files(files)
+    def remove_track(self, row: int):
+        item = self.playlist.item(row)
+        if item is not None:
+            self.playlist.remove_item(item)
+
+    def refresh_fullscreen_playlist(self):
         if self.fullscreen_window:
             self.fullscreen_window.sync_playlist(self.playlist, self.current_row())
+            self.update_fullscreen_ui()
     
     def on_item_double_clicked(self, item: QListWidgetItem):
         row = self.playlist.row(item)
@@ -1306,14 +1336,15 @@ class MusicPlayer(QMainWindow):
             self.stop()
             self.unload_track()
             self.now_playing_label.setText("Queue is empty")
-            return
-        row = self.current_row()
-        if row >= 0:
-            self.current_index = row
-        elif self.current_index > last:
-            self.current_index -= last - first + 1
-        elif self.current_index >= first:
-            self.current_index = first - 1
+        else:
+            row = self.current_row()
+            if row >= 0:
+                self.current_index = row
+            elif self.current_index > last:
+                self.current_index -= last - first + 1
+            elif self.current_index >= first:
+                self.current_index = first - 1
+        self.refresh_fullscreen_playlist()
     
     def current_row(self):
         if self.current_item is None or not isValid(self.current_item):
@@ -1324,6 +1355,7 @@ class MusicPlayer(QMainWindow):
         row = self.current_row()
         if row >= 0:
             self.current_index = row
+        self.refresh_fullscreen_playlist()
     
     def wheelEvent(self, event: QWheelEvent):
         widget_under_cursor = QApplication.widgetAt(QCursor.pos())
