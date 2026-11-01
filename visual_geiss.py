@@ -33,19 +33,24 @@ class GeissSettingsDialog(QDialog):
         wave_group = QGroupBox("Waveform")
         wave_layout = QFormLayout(wave_group)
         
+        wave_modes = [
+            ("Horizontal Oscilloscope", "The waveform as a line across the screen."),
+            ("Circular", "The waveform wrapped into a ring around the center."),
+            ("Spiral", "The waveform wound into a slowly turning spiral."),
+            ("Stereo Bars", "Vertical lines joining the first and second halves of the waveform."),
+            ("Mirrored Wave", "The waveform plus a fainter, flipped copy of it."),
+            ("Vertical Oscilloscope", "The waveform as a line running from bottom to top."),
+            ("Dots/Particles", "The waveform drawn as a row of dots."),
+            ("Spectrum Bars", "Bars showing how loud each frequency range is, bass on the left."),
+        ]
         self.wave_combo = QComboBox()
-        self.wave_combo.addItems([
-            "Horizontal Oscilloscope",
-            "Circular",
-            "Spiral",
-            "Stereo Bars",
-            "Mirrored Wave",
-            "Vertical Oscilloscope",
-            "Dots/Particles",
-            "Spectrum Bars"
-        ])
+        for index, (name, tip) in enumerate(wave_modes):
+            self.wave_combo.addItem(name)
+            self.wave_combo.setItemData(index, tip, Qt.ItemDataRole.ToolTipRole)
         self.wave_combo.currentIndexChanged.connect(self.on_wave_changed)
         wave_layout.addRow("Wave Mode:", self.wave_combo)
+        self.set_tip(self.wave_combo, "How the sound wave is drawn. Auto-Change can switch it while music plays.",
+                     wave_layout.labelForField(self.wave_combo))
         
         layout.addWidget(wave_group)
         
@@ -65,6 +70,10 @@ class GeissSettingsDialog(QDialog):
         ])
         self.palette_combo.currentIndexChanged.connect(self.on_palette_changed)
         color_layout.addRow("Color Palette:", self.palette_combo)
+        self.set_tip(self.palette_combo,
+                     "The colors used for the waveform and effects. Colors drift slowly through the palette, "
+                     "and Auto-Change sometimes moves to the next palette.",
+                     color_layout.labelForField(self.palette_combo))
         
         layout.addWidget(color_group)
         
@@ -91,10 +100,17 @@ class GeissSettingsDialog(QDialog):
         ])
         self.warp_combo.currentIndexChanged.connect(self.on_warp_changed)
         warp_layout.addRow("Warp Mode:", self.warp_combo)
-        
+        self.set_tip(self.warp_combo,
+                     "How the picture is zoomed, turned and shifted each frame before the waveform is drawn on top, "
+                     "which turns the trails into tunnels, swirls and drifts. Auto-Change picks a new one while music plays.",
+                     warp_layout.labelForField(self.warp_combo))
+
         self.instant_warp_check = QCheckBox("Instant warp transitions (like original Geiss)")
         self.instant_warp_check.stateChanged.connect(self.on_instant_warp_changed)
         warp_layout.addRow(self.instant_warp_check)
+        self.set_tip(self.instant_warp_check,
+                     "On: a new warp motion takes over at once, like the original Geiss.\n"
+                     "Off: the motion eases gradually from the old warp into the new one.")
         
         layout.addWidget(warp_group)
         
@@ -110,14 +126,21 @@ class GeissSettingsDialog(QDialog):
         decay_slider_layout.addWidget(self.decay_slider)
         decay_slider_layout.addWidget(QLabel("Longer"))
         decay_layout.addLayout(decay_slider_layout)
-        
+        self.set_tip(self.decay_slider,
+                     "How long trails linger. Toward Longer, each frame keeps more of the previous picture, "
+                     "so trails fade slowly; toward Shorter, they vanish quickly.")
+
         self.beat_decay_check = QCheckBox("Beat-reactive trails (trails shorten on beats)")
         self.beat_decay_check.stateChanged.connect(self.on_beat_decay_changed)
         decay_layout.addWidget(self.beat_decay_check)
-        
+        self.set_tip(self.beat_decay_check,
+                     "Each detected beat briefly shortens the trails, which then recover, so the picture pulses with the music.")
+
         self.dither_check = QCheckBox("Error diffusion grain (like original Geiss)")
         self.dither_check.stateChanged.connect(self.on_dither_changed)
         decay_layout.addWidget(self.dither_check)
+        self.set_tip(self.dither_check,
+                     "Adds a fine, shifting grain to the fading trails, which breaks up color banding, like the original Geiss.")
         
         dither_slider_layout = QHBoxLayout()
         dither_slider_layout.addWidget(QLabel("Subtle"))
@@ -128,40 +151,54 @@ class GeissSettingsDialog(QDialog):
         dither_slider_layout.addWidget(self.dither_slider)
         dither_slider_layout.addWidget(QLabel("Heavy"))
         decay_layout.addLayout(dither_slider_layout)
-        
+        self.set_tip(self.dither_slider, "How strong the grain is. Only used while the grain is on.")
+
         layout.addWidget(decay_group)
-        
+
         effects_group = QGroupBox("Effects")
         effects_layout = QVBoxLayout(effects_group)
-        
+
         self.nebula_check = QCheckBox("Nebula Particles")
         self.nebula_check.stateChanged.connect(self.on_effect_changed)
         effects_layout.addWidget(self.nebula_check)
-        
+        self.set_tip(self.nebula_check,
+                     "Soft points of light scattered around the center, rearranged twice a second. "
+                     "More appear when the mid frequencies are loud.")
+
         self.solar_check = QCheckBox("Solar Rays (bass-reactive)")
         self.solar_check.stateChanged.connect(self.on_effect_changed)
         effects_layout.addWidget(self.solar_check)
-        
+        self.set_tip(self.solar_check,
+                     "Rays shooting out from the center whenever the bass is strong. Louder bass makes them longer and brighter.")
+
         self.dots_check = QCheckBox("Random Dots")
         self.dots_check.stateChanged.connect(self.on_effect_changed)
         effects_layout.addWidget(self.dots_check)
-        
+        self.set_tip(self.dots_check,
+                     "Sparkling dots at random spots around the center, redrawn every frame. "
+                     "More appear when the mid frequencies are loud.")
+
         self.grid_check = QCheckBox("Grid Overlay")
         self.grid_check.stateChanged.connect(self.on_effect_changed)
         effects_layout.addWidget(self.grid_check)
-        
+        self.set_tip(self.grid_check, "A faint grid of lines drawn over the visualization.")
+
         self.border_check = QCheckBox("Color Border")
         self.border_check.stateChanged.connect(self.on_effect_changed)
         effects_layout.addWidget(self.border_check)
-        
+        self.set_tip(self.border_check, "A glowing colored frame near the edges of the visualization.")
+
         layout.addWidget(effects_group)
-        
+
         auto_group = QGroupBox("Auto-Change")
         auto_layout = QVBoxLayout(auto_group)
-        
+
         self.auto_change_check = QCheckBox("Automatically change visualization over time")
         self.auto_change_check.stateChanged.connect(self.on_auto_change_changed)
         auto_layout.addWidget(self.auto_change_check)
+        self.set_tip(self.auto_change_check,
+                     "While music plays, switch to a new warp motion every so often, sometimes with a new wave mode, "
+                     "the next palette, or Solar Rays or Random Dots turned on or off. A strong beat can trigger a change early.")
         
         duration_layout = QHBoxLayout()
         duration_layout.addWidget(QLabel("Change speed:"))
@@ -173,26 +210,38 @@ class GeissSettingsDialog(QDialog):
         duration_layout.addWidget(self.duration_slider)
         duration_layout.addWidget(QLabel("Slower"))
         auto_layout.addLayout(duration_layout)
-        
+        self.set_tip(self.duration_slider,
+                     "How long each look lasts before Auto-Change moves on, "
+                     "from about 7 seconds (Faster) to about 40 seconds (Slower).")
+
         layout.addWidget(auto_group)
-        
+
         button_layout = QHBoxLayout()
-        
+
         self.randomize_btn = QPushButton("Randomize All")
         self.randomize_btn.clicked.connect(self.randomize_all)
         button_layout.addWidget(self.randomize_btn)
-        
+        self.set_tip(self.randomize_btn,
+                     "Pick a random wave mode, palette and warp motion, and turn the effects on or off at random.")
+
         button_layout.addStretch()
-        
+
         self.reset_btn = QPushButton("Reset to Defaults")
         self.reset_btn.clicked.connect(self.reset_to_defaults)
         button_layout.addWidget(self.reset_btn)
-        
+        self.set_tip(self.reset_btn, "Put every setting in this window back to its default.")
+
         self.close_btn = QPushButton("Close")
         self.close_btn.clicked.connect(self.accept)
         button_layout.addWidget(self.close_btn)
-        
+        self.set_tip(self.close_btn, "Close this window. Changes apply as you make them and are saved when it closes.")
+
         layout.addLayout(button_layout)
+
+    def set_tip(self, widget, text, label=None):
+        widget.setToolTip(text)
+        if label is not None:
+            label.setToolTip(text)
     
     def load_current_settings(self):
         controls = (
