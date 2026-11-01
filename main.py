@@ -1013,6 +1013,7 @@ class MusicPlayer(QMainWindow):
             self.visualizer = vis_class(self.audio_analyzer)
             self.visualizer.set_playing(self.is_playing)
             self.visualizer.double_clicked.connect(self.toggle_fullscreen)
+            self.visualizer.frame_ticked.connect(self.on_visualizer_frame)
             self.visualizer_layout.addWidget(self.visualizer)
             self.visualizer_container.setMinimumHeight(150)
             self.visualizer_container.show()
@@ -1124,8 +1125,9 @@ class MusicPlayer(QMainWindow):
     
     def setup_timer(self):
         self.timer = QTimer()
-        self.timer.timeout.connect(self.update_ui)
+        self.timer.timeout.connect(self.on_ui_timer)
         self.timer.start(100)
+        self.ui_update_due = False
         
         self.slider_is_pressed = False
     
@@ -1291,6 +1293,17 @@ class MusicPlayer(QMainWindow):
         if self.player.get_media():
             position = value / 1000
             self.player.set_position(position)
+    
+    def on_ui_timer(self):
+        if self.visualizer is not None and self.visualizer.isVisible():
+            self.ui_update_due = True
+        else:
+            self.update_ui()
+    
+    def on_visualizer_frame(self):
+        if self.ui_update_due:
+            self.ui_update_due = False
+            self.update_ui()
     
     def update_ui(self):
         if not self.player.get_media():

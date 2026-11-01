@@ -1,5 +1,6 @@
 import random
-from math import sin, cos, pi, exp
+from math import sin, cos, pi, exp, sqrt
+from time import perf_counter
 
 import numpy as np
 from PySide6.QtCore import QTimer, Signal, QSettings
@@ -162,7 +163,7 @@ class GeissSettingsDialog(QDialog):
         self.nebula_check.stateChanged.connect(self.on_effect_changed)
         effects_layout.addWidget(self.nebula_check)
         self.set_tip(self.nebula_check,
-                     "Soft points of light scattered around the center, rearranged twice a second. "
+                     "Soft points of light scattered around the center, rearranged about every 0.7 seconds. "
                      "More appear when the mid frequencies are loud.")
 
         self.solar_check = QCheckBox("Solar Rays (bass-reactive)")
@@ -212,7 +213,7 @@ class GeissSettingsDialog(QDialog):
         auto_layout.addLayout(duration_layout)
         self.set_tip(self.duration_slider,
                      "How long each look lasts before Auto-Change moves on, "
-                     "from about 7 seconds (Faster) to about 40 seconds (Slower).")
+                     "from about 9 seconds (Faster) to just under a minute (Slower).")
 
         layout.addWidget(auto_group)
 
@@ -375,6 +376,7 @@ class GeissVisualization(QOpenGLWidget):
     
     NAME = "Geiss"
     double_clicked = Signal()
+    frame_ticked = Signal()
     
     def __init__(self, audio_analyzer, parent=None):
         super().__init__(parent)
@@ -449,9 +451,15 @@ class GeissVisualization(QOpenGLWidget):
         self.smoothed_bass = 0.0
         self.smoothed_mid = 0.0
         self.smoothed_treble = 0.0
+        self.audio_from = (self.smoothed_waveform, 0.0, 0.0, 0.0)
+        self.audio_to = self.audio_from
         
         self.update_counter = 0
         self.audio_update_interval = 3
+        
+        self.step_seconds = 0.046875
+        self.pending_steps = 0.0
+        self.last_animate_time = perf_counter()
         
         self.beat_history = []
         self.last_beat_time = 0
@@ -463,8 +471,9 @@ class GeissVisualization(QOpenGLWidget):
         self.prepare_next_warp()
         
         self.animation_timer = QTimer(self)
+        self.animation_timer.setTimerType(Qt.TimerType.PreciseTimer)
         self.animation_timer.timeout.connect(self.animate)
-        self.animation_timer.start(33)
+        self.animation_timer.start(17)
     
     def show_settings_dialog(self, parent=None):
         dialog = GeissSettingsDialog(self, parent)
@@ -634,19 +643,29 @@ class GeissVisualization(QOpenGLWidget):
         self.switch_to_next_warp()
     
     def animate(self):
-        self.time += 0.033
-        self.color_phase += 0.008
-        self.bg_hue += 0.001
+        now = perf_counter()
+        steps = min(now - self.last_animate_time, 0.1) / self.step_seconds
+        self.last_animate_time = now
+        self.pending_steps = min(self.pending_steps + steps, 4.0)
+        rate = self.screen().refreshRate()
+        interval = int(1000 / rate) + 1 if 20 <= rate < 59 else 17
+        if self.animation_timer.interval() != interval:
+            self.animation_timer.setInterval(interval)
+        
+        self.time += 0.033 * steps
+        self.color_phase += 0.008 * steps
+        self.bg_hue += 0.001 * steps
         self.dither_offset += 0.1
         
-        self.update_counter += 1
+        self.update_counter += steps
         
         if self.update_counter >= self.audio_update_interval:
-            self.update_counter = 0
+            self.update_counter %= self.audio_update_interval
             self.update_audio_data()
+        self.blend_audio_data()
         
         if self.is_playing and self.auto_change:
-            self.warp_timer += 1
+            self.warp_timer += steps
             if self.warp_timer >= self.warp_duration:
                 self.warp_timer = 0
                 self.select_new_warp()
@@ -664,7 +683,7 @@ class GeissVisualization(QOpenGLWidget):
             if self.instant_warp:
                 base_zoom = self.target_zoom
             else:
-                lerp = 0.03
+                lerp = 1 - 0.97 ** steps
                 base_zoom += (self.target_zoom - base_zoom) * lerp
                 self.rotation += (self.target_rotation - self.rotation) * lerp
                 self.drift_x += (self.target_drift_x - self.drift_x) * lerp
@@ -673,6 +692,7 @@ class GeissVisualization(QOpenGLWidget):
             self.bass_zoom = self.smoothed_bass * 0.005
             self.zoom = base_zoom + self.bass_zoom
         
+        self.frame_ticked.emit()
         self.update()
     
     def update_audio_data(self):
@@ -680,10 +700,9 @@ class GeissVisualization(QOpenGLWidget):
         bass, mid, treble, beat = self.audio_analyzer.get_levels()
         
         smooth = 0.7
-        self.smoothed_waveform = self.smoothed_waveform * smooth + waveform * (1 - smooth)
-        self.smoothed_bass = self.smoothed_bass * smooth + bass * (1 - smooth)
-        self.smoothed_mid = self.smoothed_mid * smooth + mid * (1 - smooth)
-        self.smoothed_treble = self.smoothed_treble * smooth + treble * (1 - smooth)
+        self.audio_from = self.audio_to
+        self.audio_to = tuple(old * smooth + new * (1 - smooth)
+                              for old, new in zip(self.audio_to, (waveform, bass, mid, treble)))
         
         if beat and self.is_playing:
             current_time = self.time
@@ -696,6 +715,11 @@ class GeissVisualization(QOpenGLWidget):
         
         if self.decay < self.base_decay:
             self.decay = min(self.base_decay, self.decay + 0.0005)
+    
+    def blend_audio_data(self):
+        blend = self.update_counter / self.audio_update_interval
+        self.smoothed_waveform, self.smoothed_bass, self.smoothed_mid, self.smoothed_treble = (
+            start + (end - start) * blend for start, end in zip(self.audio_from, self.audio_to))
     
     def initializeGL(self):
         GL.glEnable(GL.GL_BLEND)
@@ -730,7 +754,7 @@ class GeissVisualization(QOpenGLWidget):
         h = max(self.height(), 240)
         
         fmt = QOpenGLFramebufferObjectFormat()
-        fmt.setInternalTextureFormat(GL.GL_RGBA8)
+        fmt.setInternalTextureFormat(GL.GL_RGBA16)
         
         self.fbo1 = QOpenGLFramebufferObject(w, h, fmt)
         self.fbo2 = QOpenGLFramebufferObject(w, h, fmt)
@@ -753,6 +777,8 @@ class GeissVisualization(QOpenGLWidget):
         if self.fbo1 is None or self.fbo2 is None:
             return
 
+        steps = self.pending_steps
+        self.pending_steps = 0.0
         screen_viewport = [int(v) for v in GL.glGetIntegerv(GL.GL_VIEWPORT)]
 
         source_fbo = self.fbo1 if self.current_fbo == 0 else self.fbo2
@@ -768,23 +794,23 @@ class GeissVisualization(QOpenGLWidget):
         GL.glLoadIdentity()
         
         self.draw_background()
-        self.draw_warped_feedback(source_fbo)
+        self.draw_warped_feedback(source_fbo, steps)
         
         if self.dither_enabled:
-            self.draw_dither_effect()
+            self.draw_dither_effect(steps)
         
-        self.draw_waveform_with_glow()
+        self.draw_waveform_with_glow(steps)
         
         if self.effect_solar:
-            self.draw_solar_effect()
+            self.draw_solar_effect(steps)
         if self.effect_dots:
-            self.draw_dots_effect()
+            self.draw_dots_effect(steps)
         if self.effect_nebula:
-            self.draw_nebula_particles()
+            self.draw_nebula_particles(steps)
         if self.effect_grid:
-            self.draw_grid_effect()
+            self.draw_grid_effect(steps)
         if self.effect_border:
-            self.draw_border_effect()
+            self.draw_border_effect(steps)
         
         dest_fbo.release()
 
@@ -849,8 +875,8 @@ class GeissVisualization(QOpenGLWidget):
         if i == 5: return v, p, q
         return v, v, v
     
-    def draw_dither_effect(self):
-        if self.dither_texture is None:
+    def draw_dither_effect(self, steps):
+        if self.dither_texture is None or steps <= 0:
             return
         
         GL.glEnable(GL.GL_TEXTURE_2D)
@@ -864,7 +890,7 @@ class GeissVisualization(QOpenGLWidget):
 
         scale = 4.0
 
-        dither_strength = self.dither_amount * (0.8 + self.smoothed_mid * 0.4)
+        dither_strength = self.dither_amount * (0.8 + self.smoothed_mid * 0.4) * sqrt(steps)
 
         GL.glColor4f(dither_strength, dither_strength, dither_strength, 1.0)
 
@@ -890,7 +916,7 @@ class GeissVisualization(QOpenGLWidget):
         GL.glDisable(GL.GL_TEXTURE_2D)
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
     
-    def draw_warped_feedback(self, source_fbo):
+    def draw_warped_feedback(self, source_fbo, steps):
         GL.glEnable(GL.GL_TEXTURE_2D)
         GL.glBindTexture(GL.GL_TEXTURE_2D, source_fbo.texture())
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR)
@@ -902,13 +928,13 @@ class GeissVisualization(QOpenGLWidget):
         tr, tg, tb = self.hsv_to_rgb(tint_hue, 0.07, 1.0)
         
         fade = self.decay
-        GL.glColor4f(fade * tr, fade * tg, fade * tb, 1.0)
+        GL.glColor4f((fade * tr) ** steps, (fade * tg) ** steps, (fade * tb) ** steps, 1.0)
         
-        inv_zoom = 1.0 / self.zoom
+        inv_zoom = 1.0 / self.zoom ** steps
         half = 0.5
         
-        cos_r = cos(self.rotation)
-        sin_r = sin(self.rotation)
+        cos_r = cos(self.rotation * steps)
+        sin_r = sin(self.rotation * steps)
         
         corners = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
         tex_coords = []
@@ -920,8 +946,8 @@ class GeissVisualization(QOpenGLWidget):
             rx = cx * cos_r - cy * sin_r
             ry = cx * sin_r + cy * cos_r
             
-            tx = (rx + 1.0) * half + self.drift_x
-            ty = (ry + 1.0) * half + self.drift_y
+            tx = (rx + 1.0) * half + self.drift_x * steps
+            ty = (ry + 1.0) * half + self.drift_y * steps
             
             tex_coords.append((tx, ty))
         
@@ -959,7 +985,7 @@ class GeissVisualization(QOpenGLWidget):
             min(1.0, c[2] * brightness_boost)
         )
     
-    def draw_waveform_with_glow(self):
+    def draw_waveform_with_glow(self, steps):
         waveform = self.smoothed_waveform
         
         if not self.is_playing:
@@ -967,9 +993,9 @@ class GeissVisualization(QOpenGLWidget):
         
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE)
         
-        self.draw_waveform_pass(waveform, line_width_mult=3.5, alpha=0.1, brightness=0.5)
-        self.draw_waveform_pass(waveform, line_width_mult=2.0, alpha=0.2, brightness=0.7)
-        self.draw_waveform_pass(waveform, line_width_mult=1.0, alpha=0.8, brightness=1.0)
+        self.draw_waveform_pass(waveform, line_width_mult=3.5, alpha=0.1 * steps, brightness=0.5)
+        self.draw_waveform_pass(waveform, line_width_mult=2.0, alpha=0.2 * steps, brightness=0.7)
+        self.draw_waveform_pass(waveform, line_width_mult=1.0, alpha=0.8 * steps, brightness=1.0)
         
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
     
@@ -1106,7 +1132,7 @@ class GeissVisualization(QOpenGLWidget):
         GL.glLineWidth(1.0)
         GL.glPointSize(1.0)
     
-    def draw_solar_effect(self):
+    def draw_solar_effect(self, steps):
         if self.smoothed_bass < 0.2:
             return
         
@@ -1122,7 +1148,7 @@ class GeissVisualization(QOpenGLWidget):
             length = 0.12 + intensity * 0.35 + random.random() * 0.08
             
             color = self.get_color(i / num_rays, 1.0)
-            GL.glColor4f(color[0], color[1], color[2], intensity * 0.5)
+            GL.glColor4f(color[0], color[1], color[2], intensity * 0.5 * steps)
             
             GL.glVertex2f(0, 0)
             GL.glVertex2f(cos(angle) * length, sin(angle) * length)
@@ -1131,7 +1157,7 @@ class GeissVisualization(QOpenGLWidget):
         GL.glLineWidth(1.0)
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
     
-    def draw_nebula_particles(self):
+    def draw_nebula_particles(self, steps):
         num_particles = int(12 + self.smoothed_mid * 15)
         
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE)
@@ -1149,7 +1175,7 @@ class GeissVisualization(QOpenGLWidget):
             y = sin(base_angle) * (base_radius + drift)
             
             color = self.get_color(random.random(), 0.7)
-            GL.glColor4f(color[0], color[1], color[2], 0.15 + self.smoothed_mid * 0.15)
+            GL.glColor4f(color[0], color[1], color[2], (0.15 + self.smoothed_mid * 0.15) * steps)
             GL.glVertex2f(x, y)
         
         GL.glEnd()
@@ -1158,8 +1184,8 @@ class GeissVisualization(QOpenGLWidget):
         
         random.seed()
     
-    def draw_dots_effect(self):
-        num_dots = int(25 + self.smoothed_mid * 30)
+    def draw_dots_effect(self, steps):
+        num_dots = int((25 + self.smoothed_mid * 30) * steps + random.random())
         
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE)
         GL.glPointSize(2.0)
@@ -1179,10 +1205,10 @@ class GeissVisualization(QOpenGLWidget):
         GL.glPointSize(1.0)
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
     
-    def draw_grid_effect(self):
+    def draw_grid_effect(self, steps):
         GL.glLineWidth(1.0)
         color = self.get_color(self.time * 0.05 % 1.0, 0.25)
-        GL.glColor4f(color[0], color[1], color[2], 0.12)
+        GL.glColor4f(color[0], color[1], color[2], 1 - 0.88 ** (steps ** 1.75))
         
         GL.glBegin(GL.GL_LINES)
         
@@ -1195,11 +1221,11 @@ class GeissVisualization(QOpenGLWidget):
         
         GL.glEnd()
     
-    def draw_border_effect(self):
+    def draw_border_effect(self, steps):
         GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE)
         GL.glLineWidth(2.5)
         color = self.get_color(self.time * 0.1 % 1.0, 0.85)
-        GL.glColor4f(color[0], color[1], color[2], 0.35)
+        GL.glColor4f(color[0], color[1], color[2], 0.35 * steps)
         
         GL.glBegin(GL.GL_LINE_LOOP)
         GL.glVertex2f(-0.95, -0.95)
