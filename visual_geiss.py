@@ -3,7 +3,7 @@ from math import sin, cos, pi, exp, sqrt
 from time import perf_counter
 
 import numpy as np
-from PySide6.QtCore import QTimer, Signal, QSettings
+from PySide6.QtCore import QTimer, Signal
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, 
@@ -13,6 +13,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from PySide6.QtOpenGL import QOpenGLFramebufferObject, QOpenGLFramebufferObjectFormat
 from OpenGL import GL
+
+from app_settings import open_settings
 
 
 class GeissSettingsDialog(QDialog):
@@ -481,7 +483,7 @@ class GeissVisualization(QOpenGLWidget):
         self.save_settings()
     
     def load_settings(self):
-        settings = QSettings("MyMusicPlayer", "GeissVisualization")
+        settings = open_settings("GeissVisualization")
         
         self.palette_index = settings.value("palette_index", 0, type=int)
         if self.palette_index >= len(self.palettes):
@@ -517,7 +519,7 @@ class GeissVisualization(QOpenGLWidget):
         self.apply_warp_mode(self.warp_mode, instant=True)
     
     def save_settings(self):
-        settings = QSettings("MyMusicPlayer", "GeissVisualization")
+        settings = open_settings("GeissVisualization")
         
         settings.setValue("palette_index", self.palette_index)
         settings.setValue("wave_mode", self.wave_mode)

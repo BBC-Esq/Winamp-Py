@@ -6,7 +6,7 @@ from threading import Lock
 import numpy as np
 import pyaudio
 import vlc
-from PySide6.QtCore import Qt, QTimer, Signal, QSettings, QPropertyAnimation, QEasingCurve, QRect
+from PySide6.QtCore import Qt, QTimer, Signal, QPropertyAnimation, QEasingCurve, QRect
 from PySide6.QtGui import QAction, QDragEnterEvent, QDropEvent, QWheelEvent, QMouseEvent, QSurfaceFormat, QCursor
 from PySide6.QtWidgets import (
     QApplication,
@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 )
 from shiboken6 import isValid
 
+from app_settings import open_settings
 from visual_geiss import GeissVisualization
 
 
@@ -762,7 +763,7 @@ class MusicPlayer(QMainWindow):
         self.setWindowTitle("Music Player")
         self.setMinimumSize(500, 700)
         
-        self.settings = QSettings("MyMusicPlayer", "VLCPlayer")
+        self.settings = open_settings()
         
         self.audio_analyzer = AudioAnalyzer()
         

@@ -18,7 +18,7 @@ A Winamp-inspired media player built with Python, featuring real-time audio visu
 - Fullscreen visualization mode (double-click the visualizer or press F11)
 - Customizable visualization settings (waveform, colors, warp motion, trails, particle effects)
 - Volume control and seek bar
-- Remembers window state, playlist, and settings between sessions
+- Remembers window state, playlist, and settings between sessions and across upgrades, in `%APPDATA%\Winamp-Py\settings.ini`
 
 ## ⚙️ Windows Installer
 > Download and run [```WinampPy_Setup.exe```](https://github.com/BBC-Esq/Winamp-Py/releases/latest/download/WinampPy_Setup.exe) from the [latest release](https://github.com/BBC-Esq/Winamp-Py/releases/latest). [VLC media player](https://www.videolan.org/vlc/) must also be installed.
